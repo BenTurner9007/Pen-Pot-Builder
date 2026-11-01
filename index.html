@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pen Pot Builder</title>
+  <link rel="icon" type="image/png" href="images/icon.png">
+  <meta name="description" content="Design a laser-cut wooden pen pot with geometric cut-outs and send it to us to make.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <img class="brand-logo" src="images/logo.jpg" width="430" height="205" alt="TurnerMadeUK">
+      <div>
+        <h1 id="brand-name" class="visually-hidden">Pen Pot Builder</h1>
+        <p class="brand-title">Pen Pot Builder</p>
+        <p id="brand-tagline" class="tagline"></p>
+      </div>
+    </div>
+    <p class="header-note">Cut to order in the UK · Finger-jointed plywood</p>
+    <p id="owner-badge" class="owner-badge" hidden>Owner mode · <button type="button" id="owner-exit" class="link-btn">turn off</button></p>
+  </header>
+
+  <main class="layout">
+    <section class="stage" aria-label="Preview">
+      <div class="stage-tabs view-tabs" role="tablist" aria-label="Preview">
+        <button type="button" role="tab" class="tab" id="tab-3d" aria-selected="true" aria-controls="viewer">3D view</button>
+        <button type="button" role="tab" class="tab" id="tab-plan" aria-selected="false" aria-controls="plan">Flat pieces</button>
+      </div>
+      <span class="stage-size" id="stage-size"></span>
+      <div id="viewer" class="viewer" role="tabpanel" aria-labelledby="tab-3d"></div>
+      <div id="plan" class="plan" role="tabpanel" aria-labelledby="tab-plan" hidden></div>
+      <label class="check stage-pencils"><input type="checkbox" id="pencils" checked> Pencils for scale</label>
+      <p class="map-hint" id="stage-hint">Drag to turn · scroll or pinch to zoom</p>
+    </section>
+
+    <aside class="panel">
+      <ol class="steps">
+        <li class="step">
+          <h2><span class="num">01</span> Pick a size and wood</h2>
+          <div class="chips" id="sizes" role="radiogroup" aria-label="Pot size"></div>
+          <div class="row custom-size">
+            <label class="field small"><span>Width (mm)</span><input id="size-w" type="number" step="1"></label>
+            <label class="field small"><span>Depth (mm)</span><input id="size-d" type="number" step="1"></label>
+            <label class="field small"><span>Height (mm)</span><input id="size-h" type="number" step="1"></label>
+          </div>
+          <div class="row">
+            <label class="field small wood"><span>Wood</span><select id="material"></select></label>
+            <label class="field small"><span>Thickness</span><select id="thickness"></select></label>
+          </div>
+          <p id="size-note" class="field-note"></p>
+        </li>
+
+        <li class="step">
+          <h2><span class="num">02</span> Choose a pattern</h2>
+          <div class="pattern-picker" id="patterns" role="radiogroup" aria-label="Pattern"></div>
+          <div class="row">
+            <label class="field small range"><span>Shape size <output id="cell-out"></output></span><input id="cell" type="range" min="8" max="40" step="1"></label>
+            <label class="field small range"><span>Wood between <output id="bar-out"></output></span><input id="bar" type="range" min="2" max="10" step="0.5"></label>
+          </div>
+          <div class="row">
+            <label class="field small range"><span>Plain border <output id="border-out"></output></span><input id="border" type="range" min="3" max="25" step="1"></label>
+            <label class="field small">
+              <span>Size across the pot</span>
+              <select id="fade"></select>
+            </label>
+          </div>
+          <div class="seg seg3" role="radiogroup" aria-label="Which sides">
+            <label><input type="radio" name="sides" value="all" checked><span>All four sides</span></label>
+            <label><input type="radio" name="sides" value="fb"><span>Front &amp; back</span></label>
+            <label><input type="radio" name="sides" value="front"><span>Front only</span></label>
+          </div>
+          <label class="check"><input type="checkbox" id="whole" checked> <span>Whole shapes only <span class="field-note-inline">(untick to let the pattern run to the border)</span></span></label>
+          <div class="row" id="shuffle-row" hidden>
+            <button id="shuffle" class="btn" type="button">Shuffle the pattern</button>
+          </div>
+          <p id="pattern-note" class="field-note"></p>
+        </li>
+
+        <li class="step">
+          <h2><span class="num">03</span> Add a name <span class="optional">optional</span></h2>
+          <p class="step-note">Engraved on a plain band across the front: a name, a classroom, “World’s best teacher”…</p>
+          <label class="field"><span>Words</span><input id="name" maxlength="28" placeholder="e.g. Alex" autocomplete="off"></label>
+          <div class="row">
+            <label class="field small"><span>Text size</span>
+              <select id="name-size">
+                <option value="6">Small</option>
+                <option value="9" selected>Medium</option>
+                <option value="13">Large</option>
+              </select>
+            </label>
+            <label class="field small"><span>Position</span>
+              <select id="name-pos">
+                <option value="top">Near the top</option>
+                <option value="middle" selected>Middle</option>
+                <option value="bottom">Near the bottom</option>
+              </select>
+            </label>
+          </div>
+        </li>
+
+        <li class="step send">
+          <h2><span class="num">04</span> Preview and send</h2>
+          <ul id="summary" class="summary"></ul>
+          <button id="generate" class="btn primary" type="button">Create my layout</button>
+          <p id="status" class="status" role="status"></p>
+        </li>
+      </ol>
+    </aside>
+  </main>
+
+  <dialog id="result" class="result">
+    <form method="dialog" class="result-close"><button class="btn ghost" aria-label="Close">✕</button></form>
+    <h2>Your pen pot</h2>
+    <div class="result-grid">
+      <div>
+        <div id="preview" class="preview"></div>
+        <p id="scale-note" class="scale-note"></p>
+        <ul id="stats" class="stats"></ul>
+        <div class="row">
+          <button id="copy-link" class="btn" type="button">Copy share link</button>
+          <button id="download" class="btn owner-only" type="button" hidden>Download SVG (owner)</button>
+        </div>
+        <p id="owner-note" class="status owner-only" hidden></p>
+        <div class="owner-only cost" hidden>
+          <button id="cost-btn" class="btn" type="button">Work out material cost</button>
+          <div id="cost-table"></div>
+        </div>
+      </div>
+      <form id="order" class="order">
+        <h3 id="order-title">Send it to us</h3>
+        <p id="etsy-intro" class="step-note" hidden>Happy with it? Save your design to get a short code, then buy on Etsy and paste the code into the personalisation box. You pay on Etsy as usual.</p>
+        <label class="field" id="name-field"><span>Your name</span><input name="name" required autocomplete="name"></label>
+        <label class="field" id="email-field"><span>Email</span><input name="email" type="email" required autocomplete="email"></label>
+        <label class="field small qty"><span>How many pots</span><input name="quantity" id="quantity" type="number" min="1" value="1" step="1"></label>
+        <label class="field"><span>Anything else? (gift message, deadline, finish)</span><textarea name="notes" rows="3"></textarea></label>
+        <!-- Spam trap: people never see or tick this; bots that fill everything in get rejected. -->
+        <input type="checkbox" name="botcheck" class="visually-hidden" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <button class="btn primary" type="submit" id="send-request">Send request</button>
+        <p id="order-status" class="status" role="status"></p>
+        <div id="etsy-done" class="etsy-done" hidden>
+          <p class="etsy-label">Your design code</p>
+          <p class="etsy-code" id="etsy-code"></p>
+          <button class="btn" type="button" id="etsy-copy">Copy code</button>
+          <p class="etsy-help" id="etsy-help"></p>
+          <a class="btn primary etsy-buy" id="etsy-buy" target="_blank" rel="noopener">Back to Etsy to buy</a>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <footer class="site-footer">
+    <p>Made by <span id="footer-name"></span>. Finger-jointed pieces glue together in minutes; sizes are outside dimensions. Engraving font: Noto Sans (SIL OFL).</p>
+  </footer>
+
+  <script src="vendor/polygon-clipping.umd.min.js"></script>
+  <script src="vendor/opentype.min.js"></script>
+  <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
