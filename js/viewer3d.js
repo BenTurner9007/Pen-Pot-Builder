@@ -127,6 +127,13 @@ export function createViewer(container) {
   // A soft light from inside-front so the far wall's pattern still reads.
   const fill = new THREE.DirectionalLight("#fff8ee", 0.6);
   scene.add(fill);
+  // A gentle light from where the viewer stands, so surfaces seen through the
+  // holes (the inside of the far walls) read as lit wood, not as a grey
+  // panel that looks uncut.
+  const headlamp = new THREE.DirectionalLight("#fff8ee", 0.55);
+  headlamp.position.set(0, 0, 1);
+  camera.add(headlamp);
+  scene.add(camera);
 
   const model = new THREE.Group();
   scene.add(model);
@@ -245,6 +252,11 @@ export function createViewer(container) {
       camera.position.set(span * 0.75, span * 0.95, span * 1.75);
       controls.minDistance = span * 0.4;
       controls.maxDistance = span * 6;
+      // Tight near/far planes: phones often keep a coarse depth buffer, and
+      // the two skins of a double pot are only a fraction of a mm apart.
+      camera.near = span * 0.05;
+      camera.far = span * 12;
+      camera.updateProjectionMatrix();
       lastSpan = span;
     }
     controls.update();
