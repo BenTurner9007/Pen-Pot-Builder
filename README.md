@@ -13,11 +13,19 @@ download, the same Kitronik material costing and the same request form and Etsy 
    the real thickness. Then **Single wall** or **Double skin (pot in a pot)**:
    a second pot glued inside the first, its cut-outs a little smaller (the
    **3D step**, 1–5 mm) so every shape gets a stepped, layered edge.
-2. **Choose a pattern**: Honeycomb, Triangles, Diamonds, Squares, Bricks,
-   Circles, Stars (Islamic eight-point stars), Chevron, Shattered (random
+2. **Choose a pattern**, grouped in the picker:
+   - **Classic**: Honeycomb, Triangles, Diamonds, Squares, Bricks,
+   Circles, Chevron, Shattered (random
    Voronoi cells: a new pattern on every visit and every tap, or with the
    Shuffle button; the share link keeps the exact one, and the order email
-   gives its number) or Plain. Settings:
+   gives its number) or Plain.
+   - **Arabesque**: 8-point stars, Star & cross (khatam), Moroccan
+     (quatrefoils), 6-point stars
+   - **Japanese**: Asanoha (hemp leaf), Kagome (woven bamboo), Seigaiha
+     (ocean waves), Shippo (seven treasures)
+   - **Floral**: Daisies, Rosettes (flower of life), Petals
+   - **More**: Cubes (tumbling blocks), Basketweave, Waves
+   Settings:
    - shape size and **wood between** shapes (the narrowest bar of wood)
    - plain border round each wall
    - size across the pot: even, bigger towards the top, the bottom or the middle
@@ -61,6 +69,20 @@ it is left solid, which shows as plain wood behind that outer hole. The name
 is engraved on the outer front only. A double pot is 9 pieces; the SVG labels
 them `Outer front`, `Inner front` and so on, and the inside is 4 × the
 thickness narrower than the outside.
+
+### How the patterns are made
+
+The tiled patterns (`js/tilings.js`) are each a set of shapes that fill the
+wall exactly. Every shape is shrunk by half the "wood between" width, so the
+wood between neighbouring holes is exactly that width everywhere (tested
+for every pattern, single and double skin). Curved shapes are made from
+circles, so they shrink exactly; for the inner pot of a double skin each
+shape is shrunk further by the 3D step. A shape too thin for that is left
+solid, and the site says so.
+
+To add a tiling, add a function to `TILINGS` in `js/tilings.js` (lattice
+vectors plus region functions) and an entry to `PATTERNS` in
+`js/patterns.js`.
 
 ### How the joints work
 

@@ -119,9 +119,15 @@ document.querySelectorAll('input[name="skin"]').forEach((r) => {
 const material = () => materialByName($("#material").value);
 
 // ---------- Step 2: pattern ----------
-$("#patterns").innerHTML = PATTERNS.map(
-  (p) => `<button type="button" class="pattern-btn" role="radio" data-id="${p.id}" title="${p.label}">${patternIcon(p.id)}<span>${p.label}</span></button>`
-).join("");
+$("#patterns").innerHTML = [...new Set(PATTERNS.map((p) => p.group))]
+  .map(
+    (g) =>
+      `<p class="pattern-group">${g}</p>` +
+      PATTERNS.filter((p) => p.group === g)
+        .map((p) => `<button type="button" class="pattern-btn" role="radio" data-id="${p.id}" title="${p.label}">${patternIcon(p.id)}<span>${p.label}</span></button>`)
+        .join("")
+  )
+  .join("");
 $("#patterns").addEventListener("click", (e) => {
   const b = e.target.closest(".pattern-btn");
   if (!b) return;
@@ -257,7 +263,14 @@ function renderNotes() {
 
   const pn = [];
   if (state.pattern !== "none") {
-    if (m.double && state.step * 2 >= state.cell - state.bar) pn.push("The 3D step is large for these shapes, so some inner holes are too small to cut and are left solid.");
+    if (m.double) {
+      const count = (pre) => pot.pieces.filter((q) => q.id !== "base" && q.id.startsWith("inner-") === pre).reduce((n, q) => n + q.holes.length, 0);
+      const outer = count(false), inner = count(true);
+      if (outer && inner === 0)
+        pn.push(`These shapes are too slim for a ${state.step} mm 3D step, so the inner pot has no holes. Try a 1 mm step or bigger shapes.`);
+      else if (outer && inner < outer * 0.6)
+        pn.push(`Only ${inner} of ${outer} shapes are big enough for the inner pot at this 3D step; the rest stay solid behind. Try a smaller step or bigger shapes.`);
+    }
     if (state.bar < t) pn.push(`Wood between shapes is thinner than the ${t} mm wood, so the bars will be delicate.`);
     if (m.holes === 0) pn.push("No shapes fit: try a smaller shape size or border.");
     else if (m.holes > 600) pn.push(`${m.holes} cut-outs: lovely, but slow to cut.`);

@@ -11,7 +11,7 @@
 // allowed for.
 
 /* global polygonClipping */
-import { patternHoles, patternLayers, ringArea, ringPerimeter, normalise } from "./patterns.js";
+import { PATTERNS, patternHoles, patternLayers, ringArea, ringPerimeter, normalise } from "./patterns.js";
 import { nestPieces } from "./nest.js";
 import { textRings } from "./text.js";
 
@@ -295,6 +295,7 @@ function previewSvg(pieces, T, { wood = "#e9d6b2", edge = "#7a5634", ink = "#3a2
 /** A tiny swatch of a pattern for the picker. */
 export function patternIcon(kind) {
   const area = { x0: 2, y0: 2, x1: 38, y1: 38 };
-  const holes = patternHoles(kind, area, [area], { cell: 11, bar: 2, fade: "none", whole: false, seed: 3, minHoleMm: 0.8 });
+  const cell = PATTERNS.find((p) => p.id === kind)?.icon ?? 11;
+  const holes = patternHoles(kind, area, [area], { cell, bar: 2, fade: "none", whole: false, seed: 3, minHoleMm: 0.8 });
   return `<svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true"><rect x="0.5" y="0.5" width="39" height="39" rx="5" fill="currentColor" opacity=".18"/><path d="${pathD(holes)}" fill="currentColor"/></svg>`;
 }

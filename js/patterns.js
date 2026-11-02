@@ -6,18 +6,33 @@
 // directly from the pitch and bar. All units are millimetres, y down.
 
 /* global polygonClipping */
+import { tiling, TILING_IDS } from "./tilings.js";
 
+// `icon` is the shape size used for the little picker swatch.
 export const PATTERNS = [
-  { id: "honeycomb", label: "Honeycomb" },
-  { id: "triangles", label: "Triangles" },
-  { id: "diamonds", label: "Diamonds" },
-  { id: "grid", label: "Squares" },
-  { id: "bricks", label: "Bricks" },
-  { id: "circles", label: "Circles" },
-  { id: "stars", label: "Stars" },
-  { id: "chevron", label: "Chevron" },
-  { id: "shattered", label: "Shattered" },
-  { id: "none", label: "Plain" },
+  { id: "honeycomb", label: "Honeycomb", group: "Classic" },
+  { id: "triangles", label: "Triangles", group: "Classic" },
+  { id: "diamonds", label: "Diamonds", group: "Classic" },
+  { id: "grid", label: "Squares", group: "Classic" },
+  { id: "bricks", label: "Bricks", group: "Classic" },
+  { id: "circles", label: "Circles", group: "Classic" },
+  { id: "chevron", label: "Chevron", group: "Classic" },
+  { id: "shattered", label: "Shattered", group: "Classic" },
+  { id: "none", label: "Plain", group: "Classic" },
+  { id: "stars", label: "8-point stars", group: "Arabesque" },
+  { id: "starcross", label: "Star & cross", group: "Arabesque", icon: 9 },
+  { id: "quatrefoil", label: "Moroccan", group: "Arabesque", icon: 10 },
+  { id: "hexstars", label: "6-point stars", group: "Arabesque", icon: 8 },
+  { id: "asanoha", label: "Asanoha", group: "Japanese", icon: 8 },
+  { id: "kagome", label: "Kagome", group: "Japanese", icon: 9 },
+  { id: "seigaiha", label: "Seigaiha", group: "Japanese", icon: 8 },
+  { id: "shippo", label: "Shippo", group: "Japanese", icon: 9 },
+  { id: "daisies", label: "Daisies", group: "Floral", icon: 13 },
+  { id: "rosettes", label: "Rosettes", group: "Floral", icon: 9 },
+  { id: "petals", label: "Petals", group: "Floral", icon: 9 },
+  { id: "cubes", label: "Cubes", group: "More", icon: 9 },
+  { id: "basketweave", label: "Basketweave", group: "More", icon: 7 },
+  { id: "waves", label: "Waves", group: "More", icon: 8 },
 ];
 
 export const FADES = [
@@ -281,6 +296,46 @@ const tooSmall = (ring, minMm) => {
   return a < minMm * minMm || (2 * a) / ringPerimeter(ring) < minMm / 2;
 };
 
+// Tiled patterns (tilings.js): every region of every lattice point that could
+// land in the area becomes one maker. Its versions for each step are the
+// region eroded further, scaled for the fade about the same centre.
+function tilingMakers(kind, area, s, bar, fade) {
+  const ref = tiling(kind, s, bar, bar / 2);
+  const [ax, ay] = ref.v1, [bx, by] = ref.v2;
+  const cx = (area.x0 + area.x1) / 2, cy = (area.y0 + area.y1) / 2;
+  // Furthest any region reaches from its lattice point.
+  let reach = 0;
+  for (const rs of ref.shapes) for (const r of rs) for (const [x, y] of r) reach = Math.max(reach, Math.hypot(x, y));
+  const halfW = (area.x1 - area.x0) / 2 + reach, halfH = (area.y1 - area.y0) / 2 + reach;
+  const J = Math.ceil(halfH / Math.abs(by)) + 1;
+  const makers = [];
+  for (let j = -J; j <= J; j++) {
+    const oy = j * by;
+    if (Math.abs(oy) > halfH + Math.abs(by)) continue;
+    const i0 = Math.floor((-halfW - j * bx) / ax) - 1, i1 = Math.ceil((halfW - j * bx) / ax) + 1;
+    for (let i = i0; i <= i1; i++) {
+      const ox = i * ax + j * bx;
+      if (Math.abs(ox) > halfW + ax) continue;
+      ref.shapes.forEach((rs, k) => {
+        if (!rs.length) return;
+        // Centre of the region (outer version), for the fade.
+        let mx = 0, my = 0, n = 0;
+        for (const r of rs) for (const [x, y] of r) { mx += x; my += y; n++; }
+        const c = [cx + ox + mx / n, cy + oy + my / n];
+        const f = fadeScale(fade, c[1], area);
+        makers.push((step) => {
+          const t = step ? tiling(kind, s, bar, bar / 2 + step) : ref;
+          return t.shapes[k].map((r) => {
+            const moved = r.map(([x, y]) => [cx + ox + x, cy + oy + y]);
+            return f === 1 ? moved : scaleRing(moved, f, c);
+          });
+        });
+      });
+    }
+  }
+  return makers;
+}
+
 /**
  * Holes for one wall.
  * @param {string} kind     a PATTERNS id
@@ -310,7 +365,10 @@ export function patternLayers(kind, area, windows, o, steps = [0]) {
     const c = centroid(ring);
     const k = fadeScale(o.fade, c[1], area);
     const scaled = k === 1 ? ring : scaleRing(ring, k, c);
-    makers.push((step) => insetConvex(scaled, bar / 2 + step));
+    makers.push((step) => {
+      const r = insetConvex(scaled, bar / 2 + step);
+      return r ? [r] : [];
+    });
   }
   for (const cell of fixed) {
     const ring = normalise(cell);
@@ -321,27 +379,30 @@ export function patternLayers(kind, area, windows, o, steps = [0]) {
     // `step` (exactly, for a circle).
     const inr = (2 * Math.abs(ringArea(scaled))) / ringPerimeter(scaled);
     makers.push((step) => {
-      if (!step) return scaled;
+      if (!step) return [scaled];
       const f = 1 - step / inr;
-      return f > 0.1 ? scaleRing(scaled, f, c) : null;
+      return f > 0.1 ? [scaleRing(scaled, f, c)] : [];
     });
   }
+  if (TILING_IDS.includes(kind)) makers.push(...tilingMakers(kind, area, s, bar, o.fade));
 
   const out = steps.map(() => []);
   for (const make of makers) {
     const big = make(steps[0]);
-    if (!big) continue;
+    if (!big.length) continue;
     const versions = steps.map((st, i) => (i === 0 ? big : make(st)));
     for (const w of windows) {
-      if (insideRect(big, w)) {
-        versions.forEach((r, i) => r && out[i].push(r));
+      if (big.every((r) => insideRect(r, w))) {
+        versions.forEach((rs, i) => out[i].push(...rs));
         break;
       }
-      if (o.whole || !overlapsRect(big, w)) continue;
+      if (o.whole || !big.some((r) => overlapsRect(r, w))) continue;
       // Cut the shape off at the border, as if the pattern ran on underneath.
-      versions.forEach((r, i) => {
-        if (!r || !overlapsRect(r, w)) return;
-        for (const poly of polygonClipping.intersection([[...r, r[0]]], [rectRing(w)])) out[i].push(normalise(poly[0]));
+      versions.forEach((rs, i) => {
+        for (const r of rs) {
+          if (!overlapsRect(r, w)) continue;
+          for (const poly of polygonClipping.intersection([[...r, r[0]]], [rectRing(w)])) out[i].push(normalise(poly[0]));
+        }
       });
     }
   }
