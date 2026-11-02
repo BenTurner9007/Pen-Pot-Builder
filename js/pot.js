@@ -78,16 +78,26 @@ function baseOutline(W, D, T, o) {
 }
 
 // Name text as filled outlines (even-odd rings merged into proper polygons).
-function nameOutlines(text, area, sizeMm, position) {
+// sizeMm 0 means "fill the width": the text spans the wall from just inside
+// the finger joints (`full`), as tall as the wall allows.
+function nameOutlines(text, area, sizeMm, position, full) {
   if (!text) return null;
-  let size = sizeMm;
+  const fill = !sizeMm;
+  let size = fill ? 10 : sizeMm;
   let { width } = textRings(text, 0, 0, size, { weight: "bold" });
-  const room = area.x1 - area.x0 - 4;
-  if (width > room) {
+  if (!width) return null;
+  const room = fill ? full.x1 - full.x0 : area.x1 - area.x0 - 4;
+  if (fill || width > room) {
     size *= room / width;
     width = room;
   }
-  const bandH = size * 1.9;
+  const spacing = fill ? 1.6 : 1.9; // band height as a multiple of the text size
+  const maxSize = ((area.y1 - area.y0) * 0.9) / spacing;
+  if (size > maxSize) {
+    width *= maxSize / size;
+    size = maxSize;
+  }
+  const bandH = size * spacing;
   const y0 =
     position === "top" ? area.y0 : position === "bottom" ? area.y1 - bandH : (area.y0 + area.y1) / 2 - bandH / 2;
   const band = { x0: area.x0, x1: area.x1, y0, y1: y0 + bandH };
@@ -142,7 +152,7 @@ export function buildPot(o) {
     let windows = ok ? [area] : [];
     let engrave = [];
     if (wall.id === "front" && ok && o.name) {
-      const n = nameOutlines(o.name, area, o.nameMm, o.namePos);
+      const n = nameOutlines(o.name, area, o.nameMm, o.namePos, { x0: T + 3, x1: wall.len - T - 3 });
       if (n) {
         engrave = n.polys;
         // Keep a plain band of wood behind the name.

@@ -8,6 +8,8 @@ const $ = (s) => document.querySelector(s);
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
+const randomSeed = () => 1 + Math.floor(Math.random() * 999998);
+
 // ---------- State (also round-tripped through the share link) ----------
 const params = new URLSearchParams(location.search);
 const num = (k, fallback) => (params.has(k) && Number.isFinite(+params.get(k)) ? +params.get(k) : fallback);
@@ -24,10 +26,11 @@ const state = {
   border: clamp(num("bd", 7), 3, 25),
   fade: FADES.some((f) => f.id === params.get("fade")) ? params.get("fade") : "none",
   whole: params.get("whole") !== "0",
-  seed: num("seed", 1) | 0 || 1,
+  // Shattered is different on every visit unless a share link fixes it.
+  seed: params.has("seed") ? num("seed", 1) | 0 || 1 : randomSeed(),
   sides: ["all", "fb", "front"].includes(params.get("sides")) ? params.get("sides") : "all",
   name: (params.get("txt") || "").slice(0, 28),
-  nameMm: [6, 9, 13].includes(num("ts", 9)) ? num("ts", 9) : 9,
+  nameMm: [0, 6, 9, 13].includes(num("ts", 9)) ? num("ts", 9) : 9, // 0 = fill the width
   namePos: ["top", "middle", "bottom"].includes(params.get("tp")) ? params.get("tp") : "middle",
   qty: clamp(num("q", 1) | 0, 1, CONFIG.maxQuantity),
   double: params.get("dbl") === "1",
@@ -122,6 +125,8 @@ $("#patterns").innerHTML = PATTERNS.map(
 $("#patterns").addEventListener("click", (e) => {
   const b = e.target.closest(".pattern-btn");
   if (!b) return;
+  // Choosing Shattered (or tapping it again) rolls a fresh random pattern.
+  if (b.dataset.id === "shattered") state.seed = randomSeed();
   state.pattern = b.dataset.id;
   update();
 });
@@ -160,7 +165,7 @@ document.querySelectorAll('input[name="sides"]').forEach((r) => {
   });
 });
 $("#shuffle").addEventListener("click", () => {
-  state.seed = (state.seed * 7919 + 13) % 99991 || 1;
+  state.seed = randomSeed();
   update();
 });
 
@@ -494,7 +499,7 @@ function designSummary(fd) {
     `Walls: ${m.double ? `double skin, inner pot ${m.innerPot.w.toFixed(1)} × ${m.innerPot.d.toFixed(1)} × ${m.innerPot.h} mm, cut-outs ${m.step} mm smaller` : "single"}`,
     state.pattern === "none"
       ? "Pattern: plain walls"
-      : `Pattern: ${pat}, ${state.cell} mm shapes, ${state.bar} mm between, ${state.border} mm border, ` +
+      : `Pattern: ${pat}${state.pattern === "shattered" ? ` (no. ${state.seed})` : ""}, ${state.cell} mm shapes, ${state.bar} mm between, ${state.border} mm border, ` +
         `${FADES.find((f) => f.id === state.fade).label.toLowerCase()}, ${state.whole ? "whole shapes" : "runs to border"}, on ${sides} (${m.holes} cut-outs)`,
     ...(state.name.trim() ? [`Name: "${state.name.trim()}" (${$("#name-size").selectedOptions[0].text.toLowerCase()}, ${state.namePos})`] : []),
     `Open the design: ${lastResult.link}`,

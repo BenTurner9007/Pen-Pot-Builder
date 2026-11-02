@@ -15,14 +15,18 @@ download, the same Kitronik material costing and the same request form and Etsy 
    **3D step**, 1–5 mm) so every shape gets a stepped, layered edge.
 2. **Choose a pattern**: Honeycomb, Triangles, Diamonds, Squares, Bricks,
    Circles, Stars (Islamic eight-point stars), Chevron, Shattered (random
-   Voronoi cells, with a Shuffle button) or Plain. Settings:
+   Voronoi cells: a new pattern on every visit and every tap, or with the
+   Shuffle button; the share link keeps the exact one, and the order email
+   gives its number) or Plain. Settings:
    - shape size and **wood between** shapes (the narrowest bar of wood)
    - plain border round each wall
    - size across the pot: even, bigger towards the top, the bottom or the middle
    - which sides: all four, front and back, or front only
    - whole shapes only, or let the pattern run to the border
 3. **Add a name** (optional): engraved on a plain band across the front,
-   in three sizes and three positions. Long names shrink to fit.
+   small, medium, large or **fill the width** (edge to edge just inside the
+   finger joints, as tall as the wall allows), in three positions. Long names
+   shrink to fit.
 4. **Preview and send**: a live **3D model** (real thickness, wood finish,
    pencils and a ruler for scale) and the **flat pieces**, then a share link
    and a request form with a quantity.
