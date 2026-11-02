@@ -67,34 +67,33 @@ const centroid = (r) => {
 
 const scaleRing = (r, k, [cx, cy]) => r.map(([x, y]) => [cx + (x - cx) * k, cy + (y - cy) * k]);
 
-// Shrink a convex ring (positive area) by d on every side, or null if it vanishes.
+// Shrink a convex ring (positive area) by d on every side, or null if it
+// vanishes. Done as the intersection of the inward-shifted edge half-planes,
+// so short edges simply disappear instead of turning the shape inside out.
 function insetConvex(ring, d) {
+  let out = ring;
   const n = ring.length;
-  const lines = [];
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < n && out.length >= 3; i++) {
     const [x0, y0] = ring[i], [x1, y1] = ring[(i + 1) % n];
     const len = Math.hypot(x1 - x0, y1 - y0);
     if (len < 1e-9) continue;
     const dx = (x1 - x0) / len, dy = (y1 - y0) / len;
     // Left normal points inside for a positive-area ring.
-    lines.push({ px: x0 - dy * d, py: y0 + dx * d, dx, dy });
+    const px = x0 - dy * d, py = y0 + dx * d;
+    const side = ([x, y]) => dx * (y - py) - dy * (x - px); // >= 0 is inside
+    const next = [];
+    for (let k = 0; k < out.length; k++) {
+      const a = out[k], b = out[(k + 1) % out.length];
+      const sa = side(a), sb = side(b);
+      if (sa >= 0) next.push(a);
+      if ((sa >= 0) !== (sb >= 0)) {
+        const t = sa / (sa - sb);
+        next.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+      }
+    }
+    out = next;
   }
-  const out = [];
-  for (let i = 0; i < lines.length; i++) {
-    const a = lines[(i + lines.length - 1) % lines.length], b = lines[i];
-    const den = a.dx * b.dy - a.dy * b.dx;
-    if (Math.abs(den) < 1e-9) continue;
-    const t = ((b.px - a.px) * b.dy - (b.py - a.py) * b.dx) / den;
-    out.push([a.px + a.dx * t, a.py + a.dy * t]);
-  }
-  if (out.length < 3) return null;
-  // A collapsed inset turns inside out: its edges point the other way.
-  for (let i = 0; i < out.length; i++) {
-    const [x0, y0] = out[i], [x1, y1] = out[(i + 1) % out.length];
-    const l = lines[(i) % lines.length];
-    if ((x1 - x0) * l.dx + (y1 - y0) * l.dy < -1e-6) return null;
-  }
-  return ringArea(out) > 0.5 ? out : null;
+  return out.length >= 3 && ringArea(out) > 0.5 ? out : null;
 }
 
 // Keep the part of a convex ring on the near side of the bisector between p and q.
@@ -291,36 +290,60 @@ const tooSmall = (ring, minMm) => {
  * @returns {number[][][]} hole rings (positive area, not closed)
  */
 export function patternHoles(kind, area, windows, o) {
-  if (kind === "none" || !windows.length) return [];
+  return patternLayers(kind, area, windows, o, [0])[0];
+}
+
+/**
+ * The same holes at several sizes, for layered walls: layer i has every
+ * hole shrunk by steps[i] mm (steps[0] should be 0, the biggest). Each cell
+ * is kept or dropped by its biggest version, so the layers line up hole for
+ * hole. A smaller version that gets too small to cut is left out of its layer.
+ * @returns {number[][][][]} one list of hole rings per step
+ */
+export function patternLayers(kind, area, windows, o, steps = [0]) {
+  if (kind === "none" || !windows.length) return steps.map(() => []);
   const s = Math.max(4, o.cell), bar = Math.max(0.5, o.bar);
   const { convex, fixed } = cellsFor(kind, area, s, bar, mulberry32(o.seed || 1));
-  const raw = [];
+  const makers = []; // step -> ring or null, one per cell
   for (const cell of convex) {
     const ring = normalise(cell);
     const c = centroid(ring);
     const k = fadeScale(o.fade, c[1], area);
-    const shrunk = insetConvex(k === 1 ? ring : scaleRing(ring, k, c), bar / 2);
-    if (shrunk) raw.push(shrunk);
+    const scaled = k === 1 ? ring : scaleRing(ring, k, c);
+    makers.push((step) => insetConvex(scaled, bar / 2 + step));
   }
   for (const cell of fixed) {
     const ring = normalise(cell);
     const c = centroid(ring);
     const k = fadeScale(o.fade, c[1], area);
-    raw.push(k === 1 ? ring : scaleRing(ring, k, c));
+    const scaled = k === 1 ? ring : scaleRing(ring, k, c);
+    // Circles and stars: shrink about the centre so the edge moves in by about
+    // `step` (exactly, for a circle).
+    const inr = (2 * Math.abs(ringArea(scaled))) / ringPerimeter(scaled);
+    makers.push((step) => {
+      if (!step) return scaled;
+      const f = 1 - step / inr;
+      return f > 0.1 ? scaleRing(scaled, f, c) : null;
+    });
   }
 
-  const out = [];
-  for (const ring of raw) {
+  const out = steps.map(() => []);
+  for (const make of makers) {
+    const big = make(steps[0]);
+    if (!big) continue;
+    const versions = steps.map((st, i) => (i === 0 ? big : make(st)));
     for (const w of windows) {
-      if (insideRect(ring, w)) {
-        out.push(ring);
+      if (insideRect(big, w)) {
+        versions.forEach((r, i) => r && out[i].push(r));
         break;
       }
-      if (o.whole || !overlapsRect(ring, w)) continue;
+      if (o.whole || !overlapsRect(big, w)) continue;
       // Cut the shape off at the border, as if the pattern ran on underneath.
-      const parts = polygonClipping.intersection([[...ring, ring[0]]], [rectRing(w)]);
-      for (const poly of parts) out.push(normalise(poly[0]));
+      versions.forEach((r, i) => {
+        if (!r || !overlapsRect(r, w)) return;
+        for (const poly of polygonClipping.intersection([[...r, r[0]]], [rectRing(w)])) out[i].push(normalise(poly[0]));
+      });
     }
   }
-  return out.filter((r) => r.length >= 3 && !tooSmall(r, o.minHoleMm ?? 2));
+  return out.map((list) => list.filter((r) => r.length >= 3 && !tooSmall(r, o.minHoleMm ?? 2)));
 }

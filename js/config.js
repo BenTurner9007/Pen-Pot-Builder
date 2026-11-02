@@ -47,6 +47,10 @@ export const CONFIG = {
   fingerMm: 10,
   jointFitMm: 0,
 
+  // Double-skin pots: the inner pot is made this much smaller (in total, mm)
+  // than the space inside the outer pot, so it slides in for gluing.
+  innerGapMm: 0.4,
+
   // Holes smaller than about this across are dropped (too small to cut cleanly).
   minHoleMm: 2,
 

@@ -10,7 +10,9 @@ download, the same Kitronik material costing and the same request form and Etsy 
 1. **Pick a size and wood**: Classic 80 × 80 × 100, Slim, Tall, Brush pot,
    Desk tidy, or custom (45–250 mm, outside dimensions). Wood and thickness
    come from the Kitronik price list, because the finger joints are drawn for
-   the real thickness.
+   the real thickness. Then **Single wall** or **Double skin (pot in a pot)**:
+   a second pot glued inside the first, its cut-outs a little smaller (the
+   **3D step**, 1–5 mm) so every shape gets a stepped, layered edge.
 2. **Choose a pattern**: Honeycomb, Triangles, Diamonds, Squares, Bricks,
    Circles, Stars (Islamic eight-point stars), Chevron, Shattered (random
    Voronoi cells, with a Shuffle button) or Plain. Settings:
@@ -42,6 +44,19 @@ Customers cannot download the SVG; they send you the design and you download it.
   size Kitronik sells in the chosen wood and thickness and prices each, ex and
   inc VAT, cheapest highlighted, with the value of the wood actually used, the
   cost per pot and the total cut length.
+
+### Double skin
+
+The outer pot is the normal finger-jointed pot (four walls and a base). The
+inner pot is four more walls with finger-jointed corners and **no base**: it
+stands on the outer pot's base, flush with the rim, and is glued in. It is
+`innerGapMm` (0.4 mm in total) smaller than the space inside, so it slides in.
+Its holes are made from the same shapes as the outer holes, shrunk by the
+step, so they line up exactly. Where a shrunk hole would be too small to cut
+it is left solid, which shows as plain wood behind that outer hole. The name
+is engraved on the outer front only. A double pot is 9 pieces; the SVG labels
+them `Outer front`, `Inner front` and so on, and the inside is 4 × the
+thickness narrower than the outside.
 
 ### How the joints work
 

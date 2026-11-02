@@ -30,6 +30,8 @@ const state = {
   nameMm: [6, 9, 13].includes(num("ts", 9)) ? num("ts", 9) : 9,
   namePos: ["top", "middle", "bottom"].includes(params.get("tp")) ? params.get("tp") : "middle",
   qty: clamp(num("q", 1) | 0, 1, CONFIG.maxQuantity),
+  double: params.get("dbl") === "1",
+  step: clamp(num("st", 2), 1, 5),
 };
 
 // Plywood offered and its sheet prices (data/materials.json, built from the
@@ -104,6 +106,13 @@ $("#material").addEventListener("change", () => {
 });
 $("#thickness").addEventListener("change", update);
 const thickness = () => +$("#thickness").value;
+document.querySelectorAll('input[name="skin"]').forEach((r) => {
+  r.checked = (r.value === "double") === state.double;
+  r.addEventListener("change", () => {
+    state.double = r.value === "double";
+    update();
+  });
+});
 const material = () => materialByName($("#material").value);
 
 // ---------- Step 2: pattern ----------
@@ -119,6 +128,7 @@ $("#patterns").addEventListener("click", (e) => {
 $("#fade").innerHTML = FADES.map((f) => `<option value="${f.id}">${f.label}</option>`).join("");
 
 const ranges = {
+  step: { el: "#step", out: "#step-out" },
   cell: { el: "#cell", out: "#cell-out" },
   bar: { el: "#bar", out: "#bar-out" },
   border: { el: "#border", out: "#border-out" },
@@ -182,6 +192,7 @@ function potOptions() {
     pattern: state.pattern, cell: state.cell, bar: state.bar, border: state.border,
     fade: state.fade, whole: state.whole, seed: state.seed, sides: state.sides,
     name: state.name.trim(), nameMm: state.nameMm, namePos: state.namePos,
+    double: state.double, step: state.step, innerGap: CONFIG.innerGapMm ?? 0.4,
     fingerMm: CONFIG.fingerMm, fit: CONFIG.jointFitMm || 0, minHoleMm: CONFIG.minHoleMm,
   };
 }
@@ -226,18 +237,22 @@ function syncUi() {
   const plain = state.pattern === "none";
   for (const id of ["#cell", "#bar", "#fade", "#whole"]) $(id).disabled = plain;
   $("#shuffle-row").hidden = state.pattern !== "shattered";
+  $("#skin-note").hidden = !state.double;
+  $("#step-row").hidden = !state.double || plain;
 }
 
 function renderNotes() {
   const m = pot.meta, t = m.t;
   const notes = [];
   if (t < 3) notes.push(`${t} mm wood is thin for a pen pot; 3 mm or more is much sturdier.`);
-  if (m.inner.w < 35 || m.inner.d < 35) notes.push("Inside is quite narrow: pens will be a squeeze.");
+  if (m.inner.w < 35 || m.inner.d < 35)
+    notes.push(`Inside is quite narrow (${m.inner.w} × ${m.inner.d} mm): pens will be a squeeze${m.double ? ". A double skin takes up extra room, so try a bigger size" : ""}.`);
   $("#size-note").textContent = notes.join(" ");
   $("#size-note").classList.toggle("warn", notes.length > 0);
 
   const pn = [];
   if (state.pattern !== "none") {
+    if (m.double && state.step * 2 >= state.cell - state.bar) pn.push("The 3D step is large for these shapes, so some inner holes are too small to cut and are left solid.");
     if (state.bar < t) pn.push(`Wood between shapes is thinner than the ${t} mm wood, so the bars will be delicate.`);
     if (m.holes === 0) pn.push("No shapes fit: try a smaller shape size or border.");
     else if (m.holes > 600) pn.push(`${m.holes} cut-outs: lovely, but slow to cut.`);
@@ -249,7 +264,7 @@ function renderNotes() {
   const sides = { all: "all four sides", fb: "front and back", front: "the front" }[state.sides];
   $("#summary").innerHTML = [
     `<li><b>${m.w} × ${m.d} × ${m.h} mm</b> outside, ${m.inner.w} × ${m.inner.d} mm inside</li>`,
-    `<li>${escapeHtml(material().name)}, ${t} mm</li>`,
+    `<li>${escapeHtml(material().name)}, ${t} mm${m.double ? `, <b>double skin</b> (${m.step} mm step)` : ""}</li>`,
     `<li>${state.pattern === "none" ? "Plain walls" : `${pat} on ${sides} (${m.holes} cut-outs)`}</li>`,
     ...(state.name.trim() ? [`<li>“${escapeHtml(state.name.trim())}” on the front</li>`] : []),
   ].join("");
@@ -286,6 +301,7 @@ function shareLink(ref) {
     mat: $("#material").value, t: thickness(),
     pat: state.pattern, cs: state.cell, bw: state.bar, bd: state.border,
     fade: state.fade, whole: state.whole ? "1" : "0", sides: state.sides,
+    ...(state.double ? { dbl: "1", st: state.step } : {}),
     ...(state.pattern === "shattered" ? { seed: state.seed } : {}),
     ...(state.name.trim() ? { txt: state.name.trim(), ts: state.nameMm, tp: state.namePos } : {}),
     ...(state.qty > 1 ? { q: state.qty } : {}),
@@ -313,7 +329,9 @@ function renderStats() {
   const m = lastResult.pot.meta;
   $("#scale-note").innerHTML =
     `<b>${m.w} × ${m.d} × ${m.h} mm</b> outside, <b>${m.inner.w} × ${m.inner.d} × ${m.inner.h} mm</b> inside. ` +
-    `Five pieces of ${m.t} mm ${escapeHtml(material().name.toLowerCase())} that slot together with finger joints.`;
+    (m.double
+      ? `${lastResult.pot.pieces.length} pieces of ${m.t} mm ${escapeHtml(material().name.toLowerCase())}: an outer pot with finger joints, and an inner pot that glues inside it, its cut-outs ${m.step} mm smaller all round.`
+      : `Five pieces of ${m.t} mm ${escapeHtml(material().name.toLowerCase())} that slot together with finger joints.`);
   $("#stats").innerHTML = [
     `<li>Reference <b>${lastResult.ref}</b></li>`,
     `<li>Cut-outs <b>${m.holes}</b></li>`,
@@ -473,6 +491,7 @@ function designSummary(fd) {
     `Quantity: ${state.qty}`,
     `Size: ${m.w} × ${m.d} × ${m.h} mm outside (${m.inner.w} × ${m.inner.d} × ${m.inner.h} mm inside)`,
     `Wood: ${material().name}, ${m.t} mm`,
+    `Walls: ${m.double ? `double skin, inner pot ${m.innerPot.w.toFixed(1)} × ${m.innerPot.d.toFixed(1)} × ${m.innerPot.h} mm, cut-outs ${m.step} mm smaller` : "single"}`,
     state.pattern === "none"
       ? "Pattern: plain walls"
       : `Pattern: ${pat}, ${state.cell} mm shapes, ${state.bar} mm between, ${state.border} mm border, ` +

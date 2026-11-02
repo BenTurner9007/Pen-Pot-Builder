@@ -52,6 +52,11 @@
             <label class="field small wood"><span>Wood</span><select id="material"></select></label>
             <label class="field small"><span>Thickness</span><select id="thickness"></select></label>
           </div>
+          <div class="seg" role="radiogroup" aria-label="Walls">
+            <label><input type="radio" name="skin" value="single" checked><span>Single wall</span></label>
+            <label><input type="radio" name="skin" value="double"><span>Double skin (pot in a pot)</span></label>
+          </div>
+          <p id="skin-note" class="field-note" hidden>A second pot glued inside the first. Its cut-outs line up with the outer ones but are a little smaller, so every shape gets a stepped, 3D edge.</p>
           <p id="size-note" class="field-note"></p>
         </li>
 
@@ -68,6 +73,9 @@
               <span>Size across the pot</span>
               <select id="fade"></select>
             </label>
+          </div>
+          <div class="row" id="step-row" hidden>
+            <label class="field range"><span>3D step (outer holes bigger by) <output id="step-out"></output></span><input id="step" type="range" min="1" max="5" step="0.5"></label>
           </div>
           <div class="seg seg3" role="radiogroup" aria-label="Which sides">
             <label><input type="radio" name="sides" value="all" checked><span>All four sides</span></label>

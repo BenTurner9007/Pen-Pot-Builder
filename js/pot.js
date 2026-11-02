@@ -11,7 +11,7 @@
 // allowed for.
 
 /* global polygonClipping */
-import { patternHoles, ringArea, ringPerimeter, normalise } from "./patterns.js";
+import { patternHoles, patternLayers, ringArea, ringPerimeter, normalise } from "./patterns.js";
 import { nestPieces } from "./nest.js";
 import { textRings } from "./text.js";
 
@@ -38,8 +38,12 @@ function outlineFrom(w, h, notches) {
   return normalise(biggest[0]);
 }
 
-/** A wall: `len` wide, H tall. `ownsCorners` is true for front and back. */
-function wallOutline(len, H, T, ownsCorners, o) {
+/**
+ * A wall: `len` wide, H tall. `ownsCorners` is true for front and back.
+ * `plainBottom` leaves the bottom edge straight (inner walls of a double pot,
+ * which stand on the outer pot's base).
+ */
+function wallOutline(len, H, T, ownsCorners, o, plainBottom = false) {
   const notches = [];
   fingers(0, H, o.fingerMm).forEach((seg, k) => {
     const owned = k % 2 === 0 ? ownsCorners : !ownsCorners;
@@ -47,7 +51,7 @@ function wallOutline(len, H, T, ownsCorners, o) {
     const [a, b] = shrink(seg, 0, H, o.fit);
     notches.push(rect(0, a, T, b), rect(len - T, a, len, b));
   });
-  fingers(T, len - T, o.fingerMm).forEach((seg, k) => {
+  if (!plainBottom) fingers(T, len - T, o.fingerMm).forEach((seg, k) => {
     if (k % 2) return; // odd fingers are the wall's tabs
     const [a, b] = shrink(seg, 0, len, o.fit);
     notches.push(rect(a, H - T, b, H));
@@ -102,6 +106,10 @@ const pathD = (rings) => rings.map((r) => "M" + r.map(([x, y]) => `${x.toFixed(2
  *   t              material thickness
  *   pattern, cell, bar, border, fade, whole, seed, sides ("all" | "fb" | "front")
  *   name, nameMm, namePos ("top" | "middle" | "bottom")
+ *   double, step   double skin: a second, base-less pot glued inside the
+ *                  first, with every hole `step` mm smaller all round
+ *   innerGap       how much smaller (in total) the inner pot is than the
+ *                  space it fits into, so it slides in for gluing
  *   fingerMm, fit, minHoleMm
  */
 export function buildPot(o) {
@@ -119,7 +127,15 @@ export function buildPot(o) {
     { id: "right", label: "Right side", len: D, corners: false },
   ];
 
-  const pieces = walls.map((wall) => {
+  // Double skin: the inner pot fills the outer pot's inside, standing on its
+  // base and flush with its rim. Its walls use the outer walls' coordinates
+  // shifted by `off`, so the holes line up exactly.
+  const gap = o.double ? Math.max(0, o.innerGap ?? 0.4) : 0;
+  const inner = o.double ? { off: T + gap / 2, w: W - 2 * T - gap, d: D - 2 * T - gap, h: H - T } : null;
+  const steps = o.double ? [0, Math.max(0.5, o.step || 2)] : [0];
+
+  const outerWalls = [], innerWalls = [];
+  for (const wall of walls) {
     const outline = wallOutline(wall.len, H, T, wall.corners, o);
     const area = { x0: T + m, x1: wall.len - T - m, y0: m, y1: H - T - m };
     const ok = area.x1 - area.x0 > 8 && area.y1 - area.y0 > 8;
@@ -130,16 +146,29 @@ export function buildPot(o) {
       if (n) {
         engrave = n.polys;
         // Keep a plain band of wood behind the name.
-        const gap = o.bar / 2;
+        const g = o.bar / 2;
         windows = [
-          { ...area, y1: n.band.y0 - gap },
-          { ...area, y0: n.band.y1 + gap },
+          { ...area, y1: n.band.y0 - g },
+          { ...area, y0: n.band.y1 + g },
         ].filter((w) => w.y1 - w.y0 > 2);
       }
     }
-    const holes = patterned[wall.id] && ok ? patternHoles(o.pattern, area, windows, o) : [];
-    return { id: wall.id, label: wall.label, w: wall.len, h: H, outline, holes, engrave };
-  });
+    const layers = patterned[wall.id] && ok ? patternLayers(o.pattern, area, windows, o, steps) : steps.map(() => []);
+    outerWalls.push({ id: wall.id, label: o.double ? `Outer ${wall.label.toLowerCase()}` : wall.label, w: wall.len, h: H, outline, holes: layers[0], engrave });
+    if (inner) {
+      const len = wall.corners ? inner.w : inner.d;
+      innerWalls.push({
+        id: `inner-${wall.id}`,
+        label: `Inner ${wall.label.toLowerCase()}`,
+        w: len,
+        h: inner.h,
+        outline: wallOutline(len, inner.h, T, wall.corners, o, true),
+        holes: layers[1].map((r) => r.map(([x, y]) => [x - inner.off, y])),
+        engrave: [],
+      });
+    }
+  }
+  const pieces = [...outerWalls, ...innerWalls];
   pieces.push({ id: "base", label: "Base", w: W, h: D, outline: baseOutline(W, D, T, o), holes: [], engrave: [] });
 
   for (const p of pieces) {
@@ -150,7 +179,12 @@ export function buildPot(o) {
 
   const meta = {
     w: W, d: D, h: H, t: T,
-    inner: { w: +(W - 2 * T).toFixed(1), d: +(D - 2 * T).toFixed(1), h: +(H - T).toFixed(1) },
+    inner: inner
+      ? { w: +(inner.w - 2 * T).toFixed(1), d: +(inner.d - 2 * T).toFixed(1), h: +(H - T).toFixed(1) }
+      : { w: +(W - 2 * T).toFixed(1), d: +(D - 2 * T).toFixed(1), h: +(H - T).toFixed(1) },
+    double: !!inner,
+    innerPot: inner,
+    step: inner ? steps[1] : 0,
     pattern: o.pattern,
     holes: pieces.reduce((n, p) => n + p.holes.length, 0),
     cutM: pieces.reduce((n, p) => n + p.cutMm, 0) / 1000,
@@ -217,20 +251,26 @@ export function buildPot(o) {
   return { pieces, meta, buildSvg, buildCost, preview: (opts) => previewSvg(pieces, T, opts) };
 }
 
-// Flat plan for the page: the five pieces, labelled, in wood colours.
+// Flat plan for the page: every piece, labelled, in wood colours. Walls go in
+// rows of four (outer, then inner), with the base underneath.
 function previewSvg(pieces, T, { wood = "#e9d6b2", edge = "#7a5634", ink = "#3a2414" } = {}) {
-  const [front, back, left, right, base] = pieces;
   const G = 14, LABEL = 9;
-  const row1 = [front, back, left, right];
+  const walls = pieces.filter((p) => p.id !== "base");
+  const rows = [];
+  for (let i = 0; i < walls.length; i += 4) rows.push(walls.slice(i, i + 4));
+  rows.push(pieces.filter((p) => p.id === "base"));
   const placed = [];
-  let x = 0;
-  for (const p of row1) {
-    placed.push({ p, x, y: 0 });
-    x += p.w + G;
+  let y = 0, W = 0;
+  for (const row of rows) {
+    let x = 0;
+    for (const p of row) {
+      placed.push({ p, x, y });
+      x += p.w + G;
+    }
+    W = Math.max(W, x - G);
+    y += Math.max(...row.map((p) => p.h)) + LABEL + G;
   }
-  const row1H = Math.max(...row1.map((p) => p.h)) + LABEL + G;
-  placed.push({ p: base, x: 0, y: row1H });
-  const W = x - G, H = row1H + base.h + LABEL;
+  const H = y - G;
   const fs = Math.max(4, Math.min(7, W / 70));
   const parts = placed.map(
     ({ p, x, y }) =>
@@ -239,7 +279,7 @@ function previewSvg(pieces, T, { wood = "#e9d6b2", edge = "#7a5634", ink = "#3a2
       (p.engrave.length ? `<path d="${p.engrave.map((poly) => pathD(poly)).join("")}" fill="${ink}" fill-rule="evenodd"/>` : "") +
       `<text x="${p.w / 2}" y="${p.h + LABEL - 1}" text-anchor="middle" font-size="${fs}" fill="currentColor">${p.label}</text></g>`
   );
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -4 ${W + 8} ${H + 8}" role="img" aria-label="The five pieces laid flat">${parts.join("")}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -4 ${W + 8} ${H + 8}" role="img" aria-label="The pieces laid flat">${parts.join("")}</svg>`;
 }
 
 /** A tiny swatch of a pattern for the picker. */

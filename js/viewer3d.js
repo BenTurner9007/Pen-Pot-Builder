@@ -199,11 +199,20 @@ export function createViewer(container) {
     add(byId.left, (m) => { m.rotation.y = -Math.PI / 2; m.position.set(T, 0, 0); });
     add(byId.right, (m) => { m.rotation.y = -Math.PI / 2; m.position.set(W, 0, 0); });
     add(byId.base, (m) => { m.rotation.x = Math.PI / 2; m.position.set(0, T, 0); });
+    // Double skin: the inner pot stands on the base, `off` in from the outside.
+    const ip = pot.meta.innerPot;
+    if (ip) {
+      const { off, w: iw, d: id } = ip;
+      add(byId["inner-front"], (m) => m.position.set(off, T, off + id - T));
+      add(byId["inner-back"], (m) => m.position.set(off, T, off));
+      add(byId["inner-left"], (m) => { m.rotation.y = -Math.PI / 2; m.position.set(off + T, T, off); });
+      add(byId["inner-right"], (m) => { m.rotation.y = -Math.PI / 2; m.position.set(off + iw, T, off); });
+    }
     pot3d.position.set(-W / 2, 0, -D / 2);
     model.add(pot3d);
 
     if (opts.pencils !== false) {
-      const inner = { w: W - 2 * T, d: D - 2 * T };
+      const inner = pot.meta.inner;
       const spots = [
         { x: -0.22, z: -0.18, c: "#e7b416", tilt: [0.10, 0.06] },
         { x: 0.2, z: -0.05, c: "#2f5d8a", tilt: [-0.08, 0.1] },
